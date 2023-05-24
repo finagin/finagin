@@ -5,7 +5,7 @@
 [![Keybase PGP][icon-keybase-pgp]][link-keybase-pgp]
 [<img alt="DigitalOcean Referral Badge" src="https://web-platforms.sfo2.digitaloceanspaces.com/WWW/Badge%203.svg" height="28"/>][link-do-referral]
   
-My name is Igor Finagin. I'm a full-stack developer, entrepreneur. I live in Russia, Kazan and I love PHP. I am a big fan of Laravel, VueJS, Livewire and TailwindCSS. Also I am using PostgreSQL, Redis and Python. I also love [my AmStaff🐶][link-dog-instagram]
+My name is Igor Finagin. I'm a full-stack developer, entrepreneur. I live in Bishkek, Kyrgyzstan and I love PHP. I am a big fan of Laravel, VueJS, Livewire and TailwindCSS. Also I am using PostgreSQL, Redis and Python. I also love [my AmStaff🐶][link-dog-instagram]
 
 <!-- Icons -->
 
