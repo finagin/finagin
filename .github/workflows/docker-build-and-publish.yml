@@ -1,0 +1,101 @@
+name: 🐳 Build and Publish Docker Image
+
+on:
+  workflow_call:
+    secrets:
+      DOCKER_USERNAME:
+        description: 'Docker Hub username'
+        required: true
+      DOCKER_PASSWORD:
+        description: 'Docker Hub password or token'
+        required: true
+      TELEGRAM_BOT_TOKEN:
+        description: 'Telegram bot token'
+        required: true
+      TELEGRAM_CHAT_ID:
+        description: 'Notification target telegram chat ID'
+        required: true
+
+jobs:
+  docker-build-and-publish:
+    name: 🐳 Build and Publish Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: 📂 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔑 Log in to the Docker Hub Registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 🔑 Log in to the GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        env:
+          DOCKER_PUBLISH_PR: ${{ vars.DOCKER_PUBLISH_PR }}
+        with:
+          images: |
+            ${{ github.repository }}
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=schedule,value=nightly
+            type=ref,event=branch,enable=${{ github.event_name != 'schedule' }}
+            type=ref,event=pr,enable=${{ env.DOCKER_PUBLISH_PR == 'true' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/0.') }}
+            type=sha,enable=${{ github.event_name != 'pull_request' }}
+
+      - name: 🛠️ Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 🛠️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏗️ Build and push Docker image
+        id: push
+        if: ${{ steps.meta.outputs.version }}
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ github.repository }}
+          cache-to: type=gha,mode=max,scope=${{ github.repository }}
+
+      - name: 🔔 Send notification
+        id: notify
+        if: ${{ steps.meta.outputs.version }}
+        continue-on-error: true
+        env:
+          MESSAGE: |
+            Docker image `${{ github.repository }}:${{ steps.meta.outputs.version }}`
+            have been built and pushed successfully\\.
+        shell: bash
+        run: |
+          curl -s -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "chat_id": ${{ secrets.TELEGRAM_CHAT_ID }},
+              "text": "${{ env.MESSAGE }}",
+              "parse_mode": "MarkdownV2",
+              "protect_content": true,
+              "disable_notification": ${{ github.event_name == 'schedule' || env.SILENT == 'true' }},
+              "reply_markup": {"inline_keyboard": [[{
+                "text": "Check details",
+                "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }]]}
+            }' \
+            https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage > /dev/null
